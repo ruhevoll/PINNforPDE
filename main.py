@@ -12,7 +12,8 @@ class ODE_nth(tf.keras.Model):
         # Define neural network architecture
         self.dense1 = tf.keras.layers.Dense(50, activation='elu')
         self.dense2 = tf.keras.layers.Dense(50, activation='elu')
-        self.dense3 = tf.keras.layers.Dense(1)
+        self.dense3 = tf.keras.layers.Dense(50, activation='elu')
+        self.dense4 = tf.keras.layers.Dense(1)
         self.mse_loss = tf.keras.losses.MeanSquaredError() # Define MSE loss
 
     def call(self, inputs, training=False):
@@ -20,6 +21,7 @@ class ODE_nth(tf.keras.Model):
         x = self.dense1(x)
         x = self.dense2(x)
         x = self.dense3(x)
+        x = self.dense4(x)
         return x
 
     def train_step(self, data):
@@ -59,19 +61,20 @@ class ODE_nth(tf.keras.Model):
         self.compiled_metrics.update_state(y_exact, self(x, training=True))
         return {m.name: m.result() for m in self.metrics}
 
-# Example usage for IVP: y'' + y = 0, y(0) = 1, y'(0) = 0
+# Define IVP F(x, y, y', y'', ...)
 def ode_function_ivp(x, y, dy_dx, d2y_dx2):
-    return d2y_dx2 + y
+    return y*dy_dx - 4*x
 
-ivp_conditions = [(0.0, 1.0, 0), (0.0, 0.0, 1)] # y(0) = 1, y'(0) = 0
+ivp_conditions = [(1.0, 5, 0), (1.0,2.0,1)] # Format: List of tuples (x_c, y_c, order) where x_c is the point, y_c is the value, and order is the derivative order
 model_ivp = ODE_nth(ode_function_ivp, ivp_conditions, n=2, ode_type='IVP')
 
 # Compile and train IVP
-x_train = np.linspace(0, 4, 100).reshape(-1, 1)
-y_train = np.cos(x_train).reshape(-1, 1) # Exact solution
-model_ivp.compile(optimizer='adam', loss='mse', metrics=['mse'])
+x_train = np.linspace(0, 4, 200).reshape(-1, 1)
+y_train = (x_train**2 + 4).reshape(-1, 1) # Exact solution
+model_ivp.compile(optimizer=tf.keras.optimizers.Adam(learning_rate = 0.0005), loss='mse', metrics=['mse'])
 history_ivp = model_ivp.fit(x_train, y_train, batch_size=1, epochs=40)
 
+"""
 # Example usage for BVP: y'' + y = 0, y(0) = 1, y(π/2) = 0
 def ode_function_bvp(x, y, dy_dx, d2y_dx2):
     return d2y_dx2 + y
@@ -94,11 +97,12 @@ plt.xlabel('epochs')
 plt.legend(loc='upper right')
 plt.title('IVP Training History')
 plt.show()
+"""
 
 # Check the PINN at different points not included in the training set
 n = 500
 x = np.linspace(0, 4, n) # Adjust for domain, e.g., for IVP
-y_exact = np.cos(x) # Exact solution for y'' + y = 0
+y_exact = (x**2 + 4) # Exact solution
 x_tf = tf.convert_to_tensor(x.reshape(-1, 1), dtype=tf.float32)
 with tf.GradientTape(persistent=True) as t:
     t.watch(x_tf)
@@ -118,6 +122,7 @@ plt.xlabel("x")
 plt.title('IVP Solution')
 plt.show()
 
+"""
 # Summarize history for loss and metrics (BVP)
 plt.rcParams['figure.dpi'] = 150
 plt.plot(history_bvp.history['loss'], color='magenta', label='Total losses ($L_D + L_B$)')
@@ -150,3 +155,4 @@ plt.legend()
 plt.xlabel("x")
 plt.title('BVP Solution')
 plt.show()
+"""
